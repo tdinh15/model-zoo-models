@@ -1,0 +1,28 @@
+{
+    "id": "resnet50",
+    "full_name": "ResNet v2 50",
+    "variants": [
+        {
+            "id": "baseline-keras",
+            "compressed": false,
+            "weights_url": "https://model-zoo-data.latentai.io/baseline-keras/2020-03-16-06-13-03/221242539ce1af0fb6d605251bf1de4a.zip",
+            "training_dataset_id": null,
+            "training_dataset_variant_id": null,
+            "repo_url": "https://github.com/latentai/model-zoo-models/",
+            "model_schema": {
+                "output_names": "add_2",
+                "input_names": "input_1",
+                "input_shapes": "1, 224, 224, 3"
+            },
+            "compress": {
+                "type": null,
+                "bit_depth": null,
+                "quantizer": null,
+                "skip_layers": null
+                },
+            "compile": {
+                "type": null
+            }
+        }
+    ]
+}

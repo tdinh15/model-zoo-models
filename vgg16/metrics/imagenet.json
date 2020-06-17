@@ -1,0 +1,151 @@
+{
+    "performance_metrics": [
+        [
+            "CMD#",
+            "Mode",
+            "Compress",
+            "Storage",
+            "Runtime",
+            "Parameter file size (MB)",
+            "Speed (inferences/sec)",
+            "Top 1 Accuracy (%)",
+            "Top 5 Accuracy (%)"
+        ],
+        [
+            "CMD#10",
+            "Original FP32",
+            "Baseline FP",
+            "FP",
+            "TF",
+            "553.50",
+            "10.52",
+            "68.8",
+            "90.8"
+        ],
+        [
+            "CMD#11",
+            "Original Quantized",
+            "INT8",
+            "FP",
+            "TF",
+            "553.43",
+            "10.57",
+            "68.8",
+            "91.2"
+        ],
+        [
+            "CMD#12",
+            "LRE FP32 (baseline)",
+            "FP32",
+            "FP",
+            "LRE",
+            "553.43",
+            "7.00",
+            "68.8",
+            "90.8"
+        ],
+        [
+            "CMD#13",
+            "LRE FP32 (storage)",
+            "FP32",
+            "INT8",
+            "LRE",
+            "138.36",
+            "6.98",
+            "68.8",
+            "91.2"
+        ],
+        [
+            "CMD#14",
+            "LRE Int8 (storage)",
+            "INT8",
+            "INT8",
+            "LRE",
+            "138.36",
+            "7.03",
+            "68.8",
+            "91.2"
+        ],
+        [
+            "CMD#15",
+            "LRE Int8",
+            "INT8",
+            "FP",
+            "LRE",
+            "553.43",
+            "7.10",
+            "68.8",
+            "91.2"
+        ],
+        [
+            "CMD#16",
+            "LRE pow2",
+            "Pow2",
+            "INT8",
+            "LRE",
+            "138.36",
+            "7.01",
+            "68.8",
+            "91.2"
+        ],
+        [
+            "CMD#17",
+            "Tflite",
+            "INT8",
+            "INT8",
+            "TFlite",
+            "138.41",
+            "1.29",
+            "42.7",
+            "76.8"
+        ],
+        [
+            "CMD#18",
+            "LRE Int8 (full)",
+            "INT8",
+            "INT8",
+            "LRE",
+            "138.40",
+            "2.24",
+            "42.6",
+            "77.5"
+        ]
+    ],
+    "user_performance_metrics": [
+        [
+            "Mode",
+            "Parameter file size (MB)",
+            "Speed (inferences/sec)",
+            "Top 1 Accuracy (%)",
+            "Top 5 Accuracy (%)"
+        ],
+        [
+            "Original FP32",
+            "553.50",
+            "10.52",
+            "68.8",
+            "90.8"
+        ],
+        [
+            "LRE FP32 (baseline)",
+            "553.43",
+            "7.00",
+            "68.8",
+            "90.8"
+        ],
+        [
+            "LRE FP32 (storage)",
+            "138.36",
+            "6.98",
+            "68.8",
+            "91.2"
+        ],
+        [
+            "LRE Int8 (full)",
+            "138.40",
+            "2.24",
+            "42.6",
+            "77.5"
+        ]
+    ]
+}
