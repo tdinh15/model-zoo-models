@@ -9,11 +9,12 @@ from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2
 from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Input
 from tensorflow.keras.models import Model
-from tensorflow.keras.optimizers import Adadelta
+from tensorflow.keras.optimizers import SGD
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 from model_definition import image_size, preprocess_imagenet
-
+import utilities as util
+os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 
 def get_model(num_classes):
     input_tensor = Input(shape=(224, 224, 3))  # this assumes K.image_data_format() == 'channels_last'
@@ -39,7 +40,7 @@ def get_model(num_classes):
 
 def compile_model(compiledModel):
     compiledModel.compile(loss=keras.losses.categorical_crossentropy,
-                          optimizer=Adadelta(),
+                          optimizer=SGD(learning_rate=0.1,nesterov=True),
                           metrics=['accuracy'])
 
 
@@ -101,6 +102,39 @@ def modelFitGenerator():
     print("Saved class names list file to {}".format(output_class_names_path))
 
     fitModel = get_model(num_classes=train_classes)
+    
+    fitModel.save('model.h5')
+    quantizer = {
+            "class_name": "QARegularizer",
+            "config": {
+                "num_bits": 4,
+                "lambda_1": 0.0,
+                "lambda_2": 0.0,
+                "lambda_3": float(args.lamb),
+                "lambda_4": 0.0,
+                "lambda_5": 0.0,
+                "quantizer_name": "asymmetric"
+                }
+            }
+    layer_list = util.list_tf_keras_model('model.h5')
+    for layer_name, layer_attr in layer_list.items():
+        if 'kernel_regularizer' in layer_attr:
+            layer_attr['kernel_regularizer'] = quantizer
+        if 'depthwise_regularizer' in layer_attr:
+            layer_attr['depthwise_regularizer'] = quantizer
+
+    fitModel = util.attach_regularizers(
+            os.path.join("model.h5"), 
+            layer_list,
+            target_keras_h5_file=None, 
+            verbose=False, 
+            backend_session_reset=True,)
+
+    for layer in fitModel.layers:
+        if "depthwise_regularizer" in layer.get_config():
+            print(layer.name)
+            print(layer.get_config())
+
     compile_model(fitModel)
     earlyStopping = EarlyStopping(monitor='val_loss', patience=30, verbose=0, mode='min')
     mcp_save = ModelCheckpoint('.mdl_wts.h5', save_best_only=True, monitor='val_loss', mode='min')
@@ -158,6 +192,12 @@ if __name__ == '__main__':
         type=int,
         default=16,
         help='Training batch size. Number of images to process at each gradient descent step.'
+    )
+    parser.add_argument(
+        '--lamb',
+        type=float,
+        default=0.1,
+        help='lambda value'
     )
 
     args = parser.parse_args()
