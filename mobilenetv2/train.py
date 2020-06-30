@@ -9,7 +9,7 @@ from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2
 from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Input
 from tensorflow.keras.models import Model
-from tensorflow.keras.optimizers import SGD
+from tensorflow.keras.optimizers import SGD, Adam, RMSprop
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 from model_definition import image_size, preprocess_imagenet
@@ -40,9 +40,7 @@ def get_model(num_classes):
 
 def compile_model(compiledModel):
     compiledModel.compile(loss=keras.losses.categorical_crossentropy,
-                          optimizer=SGD(learning_rate=0.1,
-                                        momentum=0.9,
-                                        nesterov=True),
+                          optimizer=Adam(),
                           metrics=['accuracy'])
 
 
@@ -125,6 +123,15 @@ def modelFitGenerator():
         if 'depthwise_regularizer' in layer_attr:
             layer_attr['depthwise_regularizer'] = quantizer
 
+    
+
+    fitModel = util.attach_regularizers(
+            os.path.join("model.h5"), 
+            layer_list,
+            target_keras_h5_file=None, 
+            verbose=False, 
+            backend_session_reset=True,)
+
     for layer in fitModel.layers:
         if 'depthwise' in layer.name:
             weight_list = layer.get_weights()
@@ -134,29 +141,25 @@ def modelFitGenerator():
                 new_tensor = tensor * 2 / rang
                 layer.set_weights([new_tensor])
 
-    fitModel = util.attach_regularizers(
-            os.path.join("model.h5"), 
-            layer_list,
-            target_keras_h5_file=None, 
-            verbose=False, 
-            backend_session_reset=True,)
-
-    # for layer in fitModel.layers:
-    #     if "depthwise_regularizer" in layer.get_config():
-    #         print(layer.name)
-    #         print(layer.get_config())
+    for layer in fitModel.layers:
+        if 'depthwise' in layer.name:
+            weight_list = layer.get_weights()
+            if len(weight_list) == 1:
+                tensor = weight_list[0]
+                print(layer.name)
+                print(tensor.max() - tensor.min())
 
     compile_model(fitModel)
     earlyStopping = EarlyStopping(monitor='val_loss', patience=30, verbose=0, mode='min')
     mcp_save = ModelCheckpoint('.mdl_wts.h5', save_best_only=True, monitor='val_loss', mode='min')
-    reduce_lr_loss = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=7, verbose=1, epsilon=1e-4, mode='min')
+    reduce_lr_loss = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=10, verbose=1, epsilon=1e-4, mode='min')
     fitModel.fit_generator(
         train_generator,
         steps_per_epoch=num_train_steps,
         epochs=nb_epoch,
         validation_data=validation_generator,
         validation_steps=num_valid_steps,
-        callbacks=[earlyStopping, mcp_save, reduce_lr_loss]
+        callbacks=[earlyStopping, mcp_save]
     )
 
     fitModel.save(output_model_path, include_optimizer=False)
