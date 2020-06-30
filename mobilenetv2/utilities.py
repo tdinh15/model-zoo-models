@@ -169,7 +169,7 @@ class QARegularizer(tf.keras.regularizers.Regularizer):
         # tf.keras.backend.print_tensor(quantized_w, message=f"\nQuant {w.name}")
         # tf.keras.backend.print_tensor(w, message=f"{w.name}")
         # quant_loss = self.lambda_2 * tf.keras.backend.sum(
-            # tf.keras.backend.square(w - quantized_w), axis=None)
+        #     tf.keras.backend.square(w - quantized_w), axis=None)
         mask = tf.keras.backend.less(np.abs(w),self.threshold)
         l2_mask_loss = self.lambda_3 * tf.keras.backend.sum(
             tf.keras.backend.square(w - tf.cast(mask,'float32')*w), axis=None)
@@ -177,6 +177,7 @@ class QARegularizer(tf.keras.regularizers.Regularizer):
         #     tf.keras.backend.square(w), axis=None)
         #tf.keras.backend.print_tensor(quant_loss, message=f"\nq_loss -- [{w.name}]:")
         #tf.keras.backend.print_tensor(l2_loss, message=f"l2_loss -- [{w.name}]: ")
+        # return quant_loss + l2_loss
         return l2_mask_loss
     
     def get_config(self,):
@@ -271,9 +272,9 @@ def list_tf_keras_model(model_file, **kwargs):
                 temp_layer_dict[config_name] = layer["config"][config_name]
         layers_regularizer_json[layer_name] = copy.deepcopy(temp_layer_dict)
     #
-    print(json.dumps(layers_regularizer_json, indent=4), end="\n\n")
+    # print(json.dumps(layers_regularizer_json, indent=4), end="\n\n")
     if(kwargs.get("save_regularizers_json", None) is not None):
-        print(f"Saving regularizers JSON to \"{kwargs['save_regularizers_json']}\"...")
+        # print(f"Saving regularizers JSON to \"{kwargs['save_regularizers_json']}\"...")
         with open(kwargs["save_regularizers_json"], "w", encoding="utf-8") as json_file:
             json.dump(layers_regularizer_json, json_file, ensure_ascii=False, indent=4)
     return layers_regularizer_json

@@ -40,7 +40,9 @@ def get_model(num_classes):
 
 def compile_model(compiledModel):
     compiledModel.compile(loss=keras.losses.categorical_crossentropy,
-                          optimizer=SGD(learning_rate=0.1,nesterov=True),
+                          optimizer=SGD(learning_rate=0.1,
+                                        momentum=0.9,
+                                        nesterov=True),
                           metrics=['accuracy'])
 
 
@@ -123,6 +125,15 @@ def modelFitGenerator():
         if 'depthwise_regularizer' in layer_attr:
             layer_attr['depthwise_regularizer'] = quantizer
 
+    for layer in fitModel.layers:
+        if 'depthwise' in layer.name:
+            weight_list = layer.get_weights()
+            if len(weight_list) == 1:
+                tensor = weight_list[0]
+                rang = tensor.max() - tensor.min()
+                new_tensor = tensor * 2 / rang
+                layer.set_weights([new_tensor])
+
     fitModel = util.attach_regularizers(
             os.path.join("model.h5"), 
             layer_list,
@@ -130,10 +141,10 @@ def modelFitGenerator():
             verbose=False, 
             backend_session_reset=True,)
 
-    for layer in fitModel.layers:
-        if "depthwise_regularizer" in layer.get_config():
-            print(layer.name)
-            print(layer.get_config())
+    # for layer in fitModel.layers:
+    #     if "depthwise_regularizer" in layer.get_config():
+    #         print(layer.name)
+    #         print(layer.get_config())
 
     compile_model(fitModel)
     earlyStopping = EarlyStopping(monitor='val_loss', patience=30, verbose=0, mode='min')
@@ -199,6 +210,12 @@ if __name__ == '__main__':
         default=0.1,
         help='lambda value'
     )
+    # parser.add_argument(
+    #     '--lamb3',
+    #     type=float,
+    #     default=0.1,
+    #     help='lambda value'
+    # )
 
     args = parser.parse_args()
     train_data_dir = args.dataset_path
