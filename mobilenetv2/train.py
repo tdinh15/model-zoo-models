@@ -3,13 +3,13 @@ import argparse
 import json
 import math
 import os
-
+import numpy as np
 import tensorflow.keras as keras
 from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2
 from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Input
 from tensorflow.keras.models import Model
-from tensorflow.keras.optimizers import SGD, Adam, RMSprop
+from tensorflow.keras.optimizers import SGD, Adam, RMSprop, Adadelta
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 from model_definition import image_size, preprocess_imagenet
@@ -40,7 +40,7 @@ def get_model(num_classes):
 
 def compile_model(compiledModel):
     compiledModel.compile(loss=keras.losses.categorical_crossentropy,
-                          optimizer=Adam(),
+                          optimizer=Adadelta(),
                           metrics=['accuracy'])
 
 
@@ -107,10 +107,10 @@ def modelFitGenerator():
     quantizer = {
             "class_name": "QARegularizer",
             "config": {
-                "num_bits": 4,
+                "num_bits": 8,
                 "lambda_1": 0.0,
-                "lambda_2": 0.0,
-                "lambda_3": float(args.lamb),
+                "lambda_2": float(args.lamb2),
+                "lambda_3": float(args.lamb3),
                 "lambda_4": 0.0,
                 "lambda_5": 0.0,
                 "quantizer_name": "asymmetric"
@@ -132,22 +132,26 @@ def modelFitGenerator():
             verbose=False, 
             backend_session_reset=True,)
 
-    for layer in fitModel.layers:
-        if 'depthwise' in layer.name:
-            weight_list = layer.get_weights()
-            if len(weight_list) == 1:
-                tensor = weight_list[0]
-                rang = tensor.max() - tensor.min()
-                new_tensor = tensor * 2 / rang
-                layer.set_weights([new_tensor])
+    # fitModel.load_weights('trained_model/ckpt.h5')
 
-    for layer in fitModel.layers:
-        if 'depthwise' in layer.name:
-            weight_list = layer.get_weights()
-            if len(weight_list) == 1:
-                tensor = weight_list[0]
-                print(layer.name)
-                print(tensor.max() - tensor.min())
+    # for layer in fitModel.layers:
+    #     if 'depthwise' in layer.name:
+    #         weight_list = layer.get_weights()
+    #         if len(weight_list) == 1:
+    #             tensor = weight_list[0]
+    #             new_tensor = np.clip(tensor,-0.75,0.75)
+    #             layer.set_weights([new_tensor])
+
+    # for layer in fitModel.layers:
+    #     # weights = layer.get_weights()
+    #     # for wt in weights:
+    #     #     print(wt.max() - wt.min())
+    #     if 'depthwise' in layer.name:
+    #         weight_list = layer.get_weights()
+    #         if len(weight_list) == 1:
+    #             tensor = weight_list[0]
+    #             print(layer.name)
+    #             print(tensor.max() - tensor.min())
 
     compile_model(fitModel)
     earlyStopping = EarlyStopping(monitor='val_loss', patience=30, verbose=0, mode='min')
@@ -159,7 +163,7 @@ def modelFitGenerator():
         epochs=nb_epoch,
         validation_data=validation_generator,
         validation_steps=num_valid_steps,
-        callbacks=[earlyStopping, mcp_save]
+        callbacks=[earlyStopping, mcp_save, reduce_lr_loss]
     )
 
     fitModel.save(output_model_path, include_optimizer=False)
@@ -204,21 +208,21 @@ if __name__ == '__main__':
     parser.add_argument(
         '--batch_size',
         type=int,
-        default=16,
+        default=32,
         help='Training batch size. Number of images to process at each gradient descent step.'
     )
     parser.add_argument(
-        '--lamb',
+        '--lamb2',
         type=float,
-        default=0.1,
+        default=0,
         help='lambda value'
     )
-    # parser.add_argument(
-    #     '--lamb3',
-    #     type=float,
-    #     default=0.1,
-    #     help='lambda value'
-    # )
+    parser.add_argument(
+        '--lamb3',
+        type=float,
+        default=0,
+        help='lambda value'
+    )
 
     args = parser.parse_args()
     train_data_dir = args.dataset_path

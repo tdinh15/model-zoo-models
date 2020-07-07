@@ -170,7 +170,7 @@ class QARegularizer(tf.keras.regularizers.Regularizer):
         # tf.keras.backend.print_tensor(w, message=f"{w.name}")
         # quant_loss = self.lambda_2 * tf.keras.backend.sum(
         #     tf.keras.backend.square(w - quantized_w), axis=None)
-        mask = tf.keras.backend.less(np.abs(w),self.threshold)
+        mask = tf.keras.backend.less(tf.abs(w),self.threshold)
         l2_mask_loss = self.lambda_3 * tf.keras.backend.sum(
             tf.keras.backend.square(w - tf.cast(mask,'float32')*w), axis=None)
         # l2_loss = self.lambda_3 * tf.keras.backend.sum(
