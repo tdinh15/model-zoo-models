@@ -4,6 +4,7 @@ import json
 import math
 import os
 import numpy as np
+import tensorflow as tf
 import tensorflow.keras as keras
 from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2
 from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint
@@ -11,6 +12,7 @@ from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Input
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import SGD, Adam, RMSprop, Adadelta
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from PostQuantizer import ASYMMETRIC
 
 from model_definition import image_size, preprocess_imagenet
 import utilities as util
@@ -27,10 +29,10 @@ def get_model(num_classes):
 
     x = base_model.output
     x = GlobalAveragePooling2D()(x)
-    x = Dense(1024, activation='relu')(
-        x)  # we add dense layers so that the model can learn more complex functions and classify for better results.
-    x = Dense(1024, activation='relu')(x)  # dense layer 2
-    x = Dense(512, activation='relu')(x)  # dense layer 3
+    # x = Dense(1024, activation='relu')(
+    #     x)  # we add dense layers so that the model can learn more complex functions and classify for better results.
+    # x = Dense(1024, activation='relu')(x)  # dense layer 2
+    # x = Dense(512, activation='relu')(x)  # dense layer 3
     x = Dense(num_classes, activation='softmax')(x)  # final layer with softmax activation
 
     updatedModel = Model(base_model.input, x)
@@ -40,9 +42,53 @@ def get_model(num_classes):
 
 def compile_model(compiledModel):
     compiledModel.compile(loss=keras.losses.categorical_crossentropy,
-                          optimizer=Adadelta(),
+                          optimizer=Adadelta(learning_rate=1),
                           metrics=['accuracy'])
 
+class QuantizeWeights(keras.callbacks.Callback):
+    def __init__(self):
+        self.quantizer = ASYMMETRIC()
+
+    def on_epoch_end(self, epoch, logs=None):
+        for layer in self.model.layers:
+            t = layer.get_weights()
+            for idx, tensor in enumerate(t):
+                if len(tensor.shape) in [2,4]:
+                    new_tensor = self.quantizer.quantize(tensor,bits=args.bits)['dequant_array']
+                    t[idx] = new_tensor
+            layer.set_weights(t)
+
+class CustomLearningRateScheduler(keras.callbacks.Callback):
+    def __init__(self, schedule):
+        super(CustomLearningRateScheduler, self).__init__()
+        self.schedule = schedule
+
+    def on_epoch_begin(self, epoch, logs=None):
+        if not hasattr(self.model.optimizer, "lr"):
+            raise ValueError('Optimizer must have a "lr" attribute.')
+        lr = float(tf.keras.backend.get_value(self.model.optimizer.learning_rate))
+        scheduled_lr = self.schedule(epoch, lr)
+        tf.keras.backend.set_value(self.model.optimizer.lr, scheduled_lr)
+        # if epoch in LR_SCHEDULE:
+        print("Epoch: ", epoch, " Learning rate:", scheduled_lr)
+
+LR_SCHEDULE = [
+    # (epoch to start, learning rate) tuples
+    (40, 0.1),
+    (70, 0.01),
+    (100, 0.001),
+    (130, 0.0001),
+]
+
+
+def lr_schedule(epoch, lr):
+    """Helper function to retrieve the scheduled learning rate based on epoch."""
+    if epoch < LR_SCHEDULE[0][0]:
+        return lr
+    for i in range(1,len(LR_SCHEDULE)):
+        if epoch < LR_SCHEDULE[i][0]:
+            return LR_SCHEDULE[i-1][1]
+    return LR_SCHEDULE[-1][1]
 
 def modelFitGenerator():
 
@@ -107,7 +153,7 @@ def modelFitGenerator():
     quantizer = {
             "class_name": "QARegularizer",
             "config": {
-                "num_bits": 8,
+                "num_bits": 4,
                 "lambda_1": 0.0,
                 "lambda_2": float(args.lamb2),
                 "lambda_3": float(args.lamb3),
@@ -122,9 +168,7 @@ def modelFitGenerator():
             layer_attr['kernel_regularizer'] = quantizer
         if 'depthwise_regularizer' in layer_attr:
             layer_attr['depthwise_regularizer'] = quantizer
-
     
-
     fitModel = util.attach_regularizers(
             os.path.join("model.h5"), 
             layer_list,
@@ -156,14 +200,16 @@ def modelFitGenerator():
     compile_model(fitModel)
     earlyStopping = EarlyStopping(monitor='val_loss', patience=30, verbose=0, mode='min')
     mcp_save = ModelCheckpoint('.mdl_wts.h5', save_best_only=True, monitor='val_loss', mode='min')
-    reduce_lr_loss = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=10, verbose=1, epsilon=1e-4, mode='min')
+    reduce_lr_loss = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=30, verbose=1, epsilon=1e-4, mode='min')
     fitModel.fit_generator(
         train_generator,
         steps_per_epoch=num_train_steps,
         epochs=nb_epoch,
         validation_data=validation_generator,
         validation_steps=num_valid_steps,
-        callbacks=[earlyStopping, mcp_save, reduce_lr_loss]
+        callbacks=[mcp_save,
+                CustomLearningRateScheduler(lr_schedule),
+                QuantizeWeights()]
     )
 
     fitModel.save(output_model_path, include_optimizer=False)
@@ -222,6 +268,12 @@ if __name__ == '__main__':
         type=float,
         default=0,
         help='lambda value'
+    )
+    parser.add_argument(
+        '--bits',
+        type=float,
+        default=4,
+        help='number of bits to quantize'
     )
 
     args = parser.parse_args()
