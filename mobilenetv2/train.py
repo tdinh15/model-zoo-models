@@ -29,10 +29,10 @@ def get_model(num_classes):
 
     x = base_model.output
     x = GlobalAveragePooling2D()(x)
-    # x = Dense(1024, activation='relu')(
-    #     x)  # we add dense layers so that the model can learn more complex functions and classify for better results.
-    # x = Dense(1024, activation='relu')(x)  # dense layer 2
-    # x = Dense(512, activation='relu')(x)  # dense layer 3
+    x = Dense(1024, activation='relu')(
+        x)  # we add dense layers so that the model can learn more complex functions and classify for better results.
+    x = Dense(1024, activation='relu')(x)  # dense layer 2
+    x = Dense(512, activation='relu')(x)  # dense layer 3
     x = Dense(num_classes, activation='softmax')(x)  # final layer with softmax activation
 
     updatedModel = Model(base_model.input, x)
@@ -176,7 +176,7 @@ def modelFitGenerator():
             verbose=False, 
             backend_session_reset=True,)
 
-    # fitModel.load_weights('trained_model/ckpt.h5')
+    fitModel.load_weights('trained_model/keras/model.h5')
 
     # for layer in fitModel.layers:
     #     if 'depthwise' in layer.name:
@@ -208,8 +208,11 @@ def modelFitGenerator():
         validation_data=validation_generator,
         validation_steps=num_valid_steps,
         callbacks=[mcp_save,
-                CustomLearningRateScheduler(lr_schedule),
-                QuantizeWeights()]
+                # CustomLearningRateScheduler(lr_schedule),
+                QuantizeWeights(),
+                reduce_lr_loss,
+                # earlyStopping,
+                ]
     )
 
     fitModel.save(output_model_path, include_optimizer=False)
