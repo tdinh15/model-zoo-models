@@ -42,7 +42,7 @@ def get_model(num_classes):
 
 def compile_model(compiledModel):
     compiledModel.compile(loss=keras.losses.categorical_crossentropy,
-                          optimizer=Adadelta(learning_rate=1),
+                          optimizer=SGD(learning_rate=0.01,momentum=0.9,nesterov=True),
                           metrics=['accuracy'])
 
 class QuantizeWeights(keras.callbacks.Callback):
@@ -176,7 +176,7 @@ def modelFitGenerator():
             verbose=False, 
             backend_session_reset=True,)
 
-    fitModel.load_weights('trained_model/keras/model.h5')
+    fitModel.load_weights('keras.h5')
 
     # for layer in fitModel.layers:
     #     if 'depthwise' in layer.name:
@@ -200,7 +200,7 @@ def modelFitGenerator():
     compile_model(fitModel)
     earlyStopping = EarlyStopping(monitor='val_loss', patience=30, verbose=0, mode='min')
     mcp_save = ModelCheckpoint('.mdl_wts.h5', save_best_only=True, monitor='val_loss', mode='min')
-    reduce_lr_loss = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=30, verbose=1, epsilon=1e-4, mode='min')
+    reduce_lr_loss = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=10, verbose=1, epsilon=1e-4, mode='min')
     fitModel.fit_generator(
         train_generator,
         steps_per_epoch=num_train_steps,
